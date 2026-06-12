@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FaceLocking Dashboard</title>
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <header>
+      <h1>FaceLocking</h1>
+      <span id="state-badge" class="badge idle">IDLE</span>
+      <span id="mqtt-badge" class="badge mqtt-off">MQTT --</span>
+    </header>
+
+    <main class="grid">
+      <section class="panel video-panel">
+        <h2>Camera</h2>
+        <div class="video-wrap">
+          <img id="video" src="/video" alt="Live camera feed" />
+          <div id="search-banner" class="search-banner hidden">
+            SEARCHING FOR TARGET
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Servo pan</h2>
+        <div class="servo-gauge">
+          <div class="servo-track">
+            <div id="servo-needle" class="servo-needle"></div>
+            <div id="servo-marker" class="servo-marker"></div>
+          </div>
+          <div class="servo-labels">
+            <span>0°</span><span>90°</span><span>180°</span>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat">
+            <span class="label">Angle</span
+            ><span id="servo-angle" class="value">90°</span>
+          </div>
+          <div class="stat">
+            <span class="label">Locked</span
+            ><span id="lock-name" class="value">—</span>
+          </div>
+        </div>
+        <h3>Movement log</h3>
+        <ul id="servo-log" class="log-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Recognition</h2>
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="label">Faces</span
+            ><span id="face-count" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Track FPS</span
+            ><span id="track-fps" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Recog FPS</span
+            ><span id="recog-fps" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Threshold</span
+            ><span id="threshold" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Enrolled</span
+            ><span id="enrolled" class="value">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Lost for</span
+            ><span id="lost-for" class="value">—</span>
+          </div>
+        </div>
+        <h3>Detected faces</h3>
+        <ul id="face-list" class="face-list"></ul>
+      </section>
+
+      <section class="panel full-width">
+        <h2>System log</h2>
+        <ul id="sys-log" class="log-list tall"></ul>
+      </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "person_name": "ihirwe",
+  "session_start": "2026-06-12T17:05:25.643504",
+  "session_end": "2026-06-12T17:14:02.541972",
+  "session_duration_seconds": 516.9,
+  "activity_counts": {
+    "blink": 4,
+    "smile": 3,
+    "move_left": 5,
+    "move_right": 6,
+    "move_up": 4,
+    "move_down": 5
+  },
+  "total_activities": 27,
+  "csv_log": "C:\\Users\\RCA_USER_65\\Documents\\NE_Preps_Ihirwe\\New folder\\FaceLocking-master\\FaceLocking-master\\data\\history\\ihirwe_20260612_170525_activities.csv"
+}
