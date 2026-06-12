@@ -116,7 +116,7 @@ if (-not $SkipUpload) {
         Write-Host "  Retry:       .\start_all.bat"
         Write-Host "  Skip flash:  .\start_all.bat -SkipUpload"
         Write-Host "  Manual:      .\upload_esp8266.ps1 -Port COM5 -Baud 57600"
-        Write-Host "ESP flash may be CORRUPT (partial upload) — servo will NOT work until upload succeeds." -ForegroundColor Red
+        Write-Host "ESP flash may be CORRUPT (partial upload) - servo will NOT work until upload succeeds." -ForegroundColor Red
         $answer = Read-Host "Continue anyway without working ESP? [y/N]"
         if ($answer -notmatch '^[yY]') { exit $LASTEXITCODE }
     }
@@ -132,27 +132,8 @@ else {
 }
 
 if ($mqttOk) {
-    Write-Step "Verifying MQTT from Python"
-    python -c "import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 1883)); s.close(); print('Python MQTT port check: OK')"
-    Write-Step "Waiting for ESP8266 on WiFi/MQTT (up to 90s)"
-    python -c @"
-import time
-from src.mqtt_camera_controller import MQTTCameraController
-c = MQTTCameraController()
-c.wait_for_connection(10)
-ok = False
-for attempt in range(3):
-    if c.wait_for_esp(30):
-        ok = True
-        break
-    if attempt < 2:
-        print('  ESP not seen yet — tap RESET on NodeMCU, retrying...')
-        time.sleep(5)
-if not ok:
-    print('  Still offline: Serial Monitor 115200 on COM5 shows WiFi/MQTT errors.')
-    print('  If Broker TCP: FAILED -> run setup_mqtt_broker.bat as Administrator.')
-c.close()
-"@
+    Write-Step "Verifying MQTT from Python and waiting for ESP8266 (up to 90s)"
+    python (Join-Path $ProjectRoot "scripts\wait_for_esp.py")
 }
 
 Write-Step "Starting face tracking"

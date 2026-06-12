@@ -81,18 +81,21 @@ if ($compileExit -ne 0) { exit $compileExit }
 
 function Invoke-EraseFlash {
     param([string]$SerialPort, [int]$SerialBaud)
-    $esptool = Get-ChildItem -Path "$env:LOCALAPPDATA\Arduino15\packages\esp8266\tools\esptool" -Recurse -Filter "esptool.exe" -ErrorAction SilentlyContinue |
+    $esptool = Get-ChildItem -Path "$env:LOCALAPPDATA\Arduino15\packages\esp8266" -Recurse -Filter "esptool.py" -ErrorAction SilentlyContinue |
+        Where-Object { $_.DirectoryName -notmatch 'flasher_stub' } |
         Select-Object -First 1
     if (-not $esptool) {
-        Write-Host "Skipping flash erase (esptool not found)" -ForegroundColor Yellow
+        Write-Host "Skipping flash erase (esptool.py not found)" -ForegroundColor Yellow
         return
     }
     Write-Host "Erasing flash (fixes crash loop after partial upload)..." -ForegroundColor Cyan
     $prev = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    & $esptool.FullName --port $SerialPort --baud $SerialBaud erase_flash 2>&1 | ForEach-Object { Write-Host $_ }
+    $sysPy = "C:\Users\RCA_USER_65\AppData\Local\Programs\Python\Python312\python.exe"
+    $erasePy = if (Test-Path $sysPy) { $sysPy } else { "python" }
+    & $erasePy $esptool.FullName --port $SerialPort --baud $SerialBaud erase_flash 2>&1 | ForEach-Object { Write-Host $_ }
     $ErrorActionPreference = $prev
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 4
 }
 
 Write-Host ""
