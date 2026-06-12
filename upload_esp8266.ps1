@@ -79,15 +79,35 @@ if (-not $cli) {
 $compileExit = Invoke-ArduinoCli @("compile", "--fqbn", $Fqbn, $Sketch)
 if ($compileExit -ne 0) { exit $compileExit }
 
+function Invoke-EraseFlash {
+    param([string]$SerialPort, [int]$SerialBaud)
+    $esptool = Get-ChildItem -Path "$env:LOCALAPPDATA\Arduino15\packages\esp8266\tools\esptool" -Recurse -Filter "esptool.exe" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $esptool) {
+        Write-Host "Skipping flash erase (esptool not found)" -ForegroundColor Yellow
+        return
+    }
+    Write-Host "Erasing flash (fixes crash loop after partial upload)..." -ForegroundColor Cyan
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $esptool.FullName --port $SerialPort --baud $SerialBaud erase_flash 2>&1 | ForEach-Object { Write-Host $_ }
+    $ErrorActionPreference = $prev
+    Start-Sleep -Seconds 3
+}
+
 Write-Host ""
 Write-Host "Uploading... (hold FLASH, tap RESET, release FLASH if it fails)" -ForegroundColor Cyan
 Start-Sleep -Seconds 2
+Invoke-EraseFlash -SerialPort $Port -SerialBaud $Baud
 
 $code = 1
-for ($attempt = 1; $attempt -le 3; $attempt++) {
+for ($attempt = 1; $attempt -le 5; $attempt++) {
     if ($attempt -gt 1) {
-        Write-Host "Retry $attempt/3 in 3s..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 3
+        Write-Host "Retry $attempt/5 in 8s..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 8
+        if ($attempt -eq 3) {
+            Invoke-EraseFlash -SerialPort $Port -SerialBaud $Baud
+        }
     }
     $code = Invoke-ArduinoCli @("upload", "-p", $Port, "--fqbn", $Fqbn, $Sketch)
     if ($code -eq 0) { break }

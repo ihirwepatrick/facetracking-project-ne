@@ -151,15 +151,23 @@ class MQTTCameraController:
     def wait_for_esp(self, timeout_sec: float = 25.0) -> bool:
         """Wait until ESP publishes camera/status (WiFi + MQTT on device)."""
         deadline = time.time() + timeout_sec
+        last_hint = 0.0
         while time.time() < deadline:
             if self.esp_is_online:
                 print(f"✓ ESP8266 online — servo reported at {self.current_angle}°")
                 return True
+            now = time.time()
+            if now - last_hint >= 8.0:
+                remaining = int(deadline - now)
+                print(f"  … waiting for ESP camera/status ({remaining}s left)")
+                last_hint = now
             time.sleep(0.4)
         print("⚠ ESP8266 NOT on MQTT — servo will NOT move until it connects.")
         print(f"  Broker: {self.broker_host}:{self.broker_port}")
-        print("  Fix: 1) ESP USB powered  2) WiFi 'Stay Hydrated'  3) Reset ESP button")
-        print("  Test: python debug_mqtt_tracking.py   (should see camera/status messages)")
+        print("  Fix: 1) ESP USB powered  2) WiFi 'Stay Hydrated' (2.4 GHz)")
+        print("       3) Reset ESP  4) setup_mqtt_broker.bat as Admin if Serial shows 'Broker TCP: FAILED'")
+        print("       5) Re-flash: .\\upload_esp8266.ps1 -Port COM5  (do not continue after failed upload)")
+        print("  Test: python debug_mqtt_tracking.py   (should see camera/status every ~150ms)")
         return False
 
     def close(self) -> None:

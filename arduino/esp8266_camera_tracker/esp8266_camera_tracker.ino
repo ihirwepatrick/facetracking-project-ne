@@ -82,6 +82,10 @@ int currentAngle = SERVO_CENTER_ANGLE;
 int targetAngle = SERVO_CENTER_ANGLE;
 unsigned long lastStatusUpdate = 0;
 const unsigned long STATUS_UPDATE_INTERVAL = 150;  // Frequent status so Python tracks real angle
+unsigned long lastMqttAttempt = 0;
+unsigned long lastWifiAttempt = 0;
+const unsigned long MQTT_RETRY_MS = 3000;
+const unsigned long WIFI_RETRY_MS = 5000;
 
 // ============================================================================
 // SETUP
@@ -108,6 +112,7 @@ void setup() {
   // Setup MQTT
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(mqtt_callback);
+  client.setSocketTimeout(15);
 
   Serial.println("\n✓ Setup complete!");
   Serial.println("Waiting for MQTT commands...\n");
@@ -117,16 +122,28 @@ void setup() {
 // WIFI SETUP
 // ============================================================================
 
+bool tcpBrokerReachable() {
+  WiFiClient probe;
+  probe.setTimeout(5000);
+  bool ok = probe.connect(mqtt_server, mqtt_port);
+  if (ok) {
+    probe.stop();
+  }
+  return ok;
+}
+
 void setup_wifi() {
   delay(10);
   Serial.print("Connecting to WiFi: ");
   Serial.println(ssid);
 
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   WiFi.begin(ssid, password);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 60) {
     delay(500);
     Serial.print(".");
     attempts++;
@@ -136,47 +153,97 @@ void setup_wifi() {
     Serial.println("\n✓ WiFi connected!");
     Serial.print("  IP address: ");
     Serial.println(WiFi.localIP());
+    Serial.print("  MQTT broker: ");
+    Serial.print(mqtt_server);
+    Serial.print(":");
+    Serial.println(mqtt_port);
     Serial.print("  Signal strength: ");
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
   } else {
     Serial.println("\n✗ WiFi connection failed!");
-    Serial.println("  Please check your credentials and try again");
+    Serial.println("  Check SSID/password and use 2.4 GHz WiFi (ESP8266 cannot use 5 GHz)");
   }
+}
+
+bool ensure_wifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
+  unsigned long now = millis();
+  if (now - lastWifiAttempt < WIFI_RETRY_MS) {
+    return false;
+  }
+  lastWifiAttempt = now;
+  Serial.println("WiFi lost — reconnecting...");
+  WiFi.disconnect();
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
+    delay(250);
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("✓ WiFi back: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+  Serial.println("✗ WiFi still down");
+  return false;
 }
 
 // ============================================================================
 // MQTT RECONNECT
 // ============================================================================
 
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Connecting to MQTT broker...");
+void onMqttConnected() {
+  client.subscribe(topic_horizontal);
+  client.subscribe(topic_command);
+  Serial.println("✓ MQTT connected and subscribed");
+  publishStatus();
+}
 
-    String clientId = "ESP8266_CameraTracker_";
-    clientId += String(random(0xffff), HEX);
+void mqttMaintain() {
+  if (client.connected()) {
+    return;
+  }
 
-    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
-      Serial.println(" connected!");
+  unsigned long now = millis();
+  if (now - lastMqttAttempt < MQTT_RETRY_MS) {
+    return;
+  }
+  lastMqttAttempt = now;
 
-      // Subscribe to topics
-      client.subscribe(topic_horizontal);
-      client.subscribe(topic_command);
+  if (!ensure_wifi()) {
+    return;
+  }
 
-      Serial.println("✓ Subscribed to topics:");
-      Serial.print("  - ");
-      Serial.println(topic_horizontal);
-      Serial.print("  - ");
-      Serial.println(topic_command);
+  if (!tcpBrokerReachable()) {
+    Serial.print("✗ Cannot reach broker ");
+    Serial.print(mqtt_server);
+    Serial.println(" — run setup_mqtt_broker.bat as Admin on the PC");
+    return;
+  }
 
-      // Publish initial status
-      publishStatus();
+  Serial.print("MQTT connect ");
+  Serial.print(mqtt_server);
+  Serial.print(":");
+  Serial.println(mqtt_port);
 
+  String clientId = "ESP8266_CameraTracker_";
+  clientId += String(random(0xffff), HEX);
+
+  if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
+    Serial.println("✓ MQTT connected!");
+    onMqttConnected();
+  } else {
+    Serial.print("✗ MQTT failed rc=");
+    Serial.print(client.state());
+    Serial.print(" WiFi=");
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println(WiFi.localIP());
     } else {
-      Serial.print(" failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" retrying in 5 seconds...");
-      delay(5000);
+      Serial.println("DOWN");
     }
   }
 }
@@ -330,10 +397,7 @@ void publishStatus() {
 // ============================================================================
 
 void loop() {
-  // Maintain MQTT connection
-  if (!client.connected()) {
-    reconnect();
-  }
+  mqttMaintain();
   client.loop();
 
   // Update servo position smoothly
